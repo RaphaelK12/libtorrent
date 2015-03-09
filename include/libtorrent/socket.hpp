@@ -132,9 +132,9 @@ namespace libtorrent
 #endif
 		type_of_service(char val): m_value(val) {}
 		template<class Protocol>
-		int level(Protocol const&) const { return IPPROTO_IP; }
+		int level(Protocol const&) const { return 0; }
 		template<class Protocol>
-		int name(Protocol const&) const { return IP_TOS; }
+		int name(Protocol const&) const { return 3; }
 		template<class Protocol>
 		tos_t const* data(Protocol const&) const { return &m_value; }
 		template<class Protocol>
