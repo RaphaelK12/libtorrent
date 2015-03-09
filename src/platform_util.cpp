@@ -75,6 +75,7 @@ namespace libtorrent
 		size_t len = sizeof(ret);
 		if (sysctl(mib, 2, &ret, &len, NULL, 0) != 0)
 			ret = 0;
+#elif defined TORRENT_WINRT
 #elif defined TORRENT_WINDOWS
 		MEMORYSTATUSEX ms;
 		ms.dwLength = sizeof(MEMORYSTATUSEX);
