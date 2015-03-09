@@ -459,7 +459,9 @@ namespace libtorrent
 	void hard_link(std::string const& file, std::string const& link
 		, error_code& ec)
 	{
-#ifdef TORRENT_WINDOWS
+#ifdef TORRENT_WINRT
+		return;
+#elif TORRENT_WINDOWS
 
 #if TORRENT_USE_WSTRING
 #define CreateHardLink_ CreateHardLinkW
@@ -550,7 +552,8 @@ namespace libtorrent
 	void copy_file(std::string const& inf, std::string const& newf, error_code& ec)
 	{
 		ec.clear();
-#ifdef TORRENT_WINDOWS
+#ifdef TORRENT_WINRT
+#elif defined TORRENT_WINDOWS
 #if TORRENT_USE_WSTRING
 #define CopyFile_ CopyFileW
 		std::wstring f1 = convert_to_wstring(inf);
@@ -872,7 +875,9 @@ namespace libtorrent
 
 	std::string current_working_directory()
 	{
-#if defined TORRENT_WINDOWS && !defined TORRENT_MINGW
+#if defined TORRENT_WINRT
+		return ".";
+#elif defined TORRENT_WINDOWS && !defined TORRENT_MINGW
 #if TORRENT_USE_WSTRING
 		wchar_t cwd[TORRENT_MAX_PATH];
 		_wgetcwd(cwd, sizeof(cwd) / sizeof(wchar_t));
@@ -884,10 +889,12 @@ namespace libtorrent
 		char cwd[TORRENT_MAX_PATH];
 		if (getcwd(cwd, sizeof(cwd)) == 0) return "/";
 #endif
+#if !defined TORRENT_WINRT
 #if defined TORRENT_WINDOWS && !defined TORRENT_MINGW && TORRENT_USE_WSTRING
 		return convert_from_wstring(cwd);
 #else
 		return convert_from_native(cwd);
+#endif
 #endif
 	}
 
@@ -1077,7 +1084,10 @@ namespace libtorrent
 		: m_done(false)
 	{
 		ec.clear();
-#ifdef TORRENT_WINDOWS
+#ifdef TORRENT_WINRT
+		m_done = true;
+		return;
+#elif defined TORRENT_WINDOWS
 		m_inode = 0;
 		// the path passed to FindFirstFile() must be
 		// a pattern
@@ -1186,7 +1196,7 @@ namespace libtorrent
 #define INVALID_HANDLE_VALUE -1
 #endif
 
-#ifdef TORRENT_WINDOWS
+#if defined TORRENT_WINDOWS && !defined TORRENT_WINRT
 	struct overlapped_t
 	{
 		overlapped_t()
@@ -1349,9 +1359,13 @@ namespace libtorrent
 			| ((mode & direct_io) ? FILE_FLAG_NO_BUFFERING : 0)
 			| ((mode & no_cache) ? FILE_FLAG_WRITE_THROUGH : 0);
 
+#ifdef TORRENT_WINRT
+		handle_type handle = INVALID_HANDLE_VALUE;
+#else
 		handle_type handle = CreateFile_(m_path.c_str(), m.rw_mode
 			, (mode & lock_file) ? FILE_SHARE_READ : FILE_SHARE_READ | FILE_SHARE_WRITE
 			, 0, m.create_mode, flags, 0);
+#endif
 
 		if (handle == INVALID_HANDLE_VALUE)
 		{
@@ -1362,6 +1376,7 @@ namespace libtorrent
 
 		m_file_handle = handle;
 
+#ifndef TORRENT_WINRT
 		// try to make the file sparse if supported
 		// only set this flag if the file is opened for writing
 		if ((mode & file::sparse) && (mode & rw_mask) != read_only)
@@ -1374,6 +1389,7 @@ namespace libtorrent
 			if (ret == FALSE && GetLastError() == ERROR_IO_PENDING)
 				ol.wait(native_handle(), error);
 		}
+#endif
 #else // TORRENT_WINDOWS
 
 		// rely on default umask to filter x and w permissions
@@ -1484,7 +1500,7 @@ namespace libtorrent
 		return m_file_handle != INVALID_HANDLE_VALUE;
 	}
 
-#ifdef TORRENT_WINDOWS
+#if defined TORRENT_WINDOWS && !defined TORRENT_WINRT
 	// returns true if the given file has any regions that are
 	// sparse, i.e. not allocated.
 	bool is_sparse(HANDLE file)
@@ -1544,7 +1560,7 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 #endif
 
 		if (!is_open()) return;
-
+#ifndef TORRENT_WINRT
 #ifdef TORRENT_WINDOWS
 
 		// if this file is open for writing, has the sparse
@@ -1581,7 +1597,7 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 		if (m_file_handle != INVALID_HANDLE_VALUE)
 			::close(m_file_handle);
 #endif
-
+#endif
 		m_file_handle = INVALID_HANDLE_VALUE;
 
 		m_open_mode = 0;
@@ -1776,7 +1792,9 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 				flags &= ~file::coalesce_buffers;
 		}
 
-#if TORRENT_USE_PREAD
+#ifdef TORRENT_WINRT
+		int ret = -1;
+#elif defined TORRENT_USE_PREAD
 		int ret = iov(&::pread, native_handle(), file_offset, bufs, num_bufs, ec);
 #else
 		int ret = iov(&::read, native_handle(), file_offset, bufs, num_bufs, ec);
@@ -1823,7 +1841,9 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 				flags &= ~file::coalesce_buffers;
 		}
 
-#if TORRENT_USE_PREAD
+#ifdef TORRENT_WINRT
+		int ret = -1;
+#elif defined TORRENT_USE_PREAD
 		int ret = iov(&::pwrite, native_handle(), file_offset, bufs, num_bufs, ec);
 #else
 		int ret = iov(&::write, native_handle(), file_offset, bufs, num_bufs, ec);
@@ -1852,6 +1872,9 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 #ifdef TORRENT_WINDOWS
 	bool get_manage_volume_privs()
 	{
+#ifdef TORRENT_WINRT
+		return false;
+#else
 		typedef BOOL (WINAPI *OpenProcessToken_t)(
 			HANDLE ProcessHandle,
 			DWORD DesiredAccess,
@@ -1917,10 +1940,12 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 		CloseHandle(token);
 
 		return ret;
+#endif
 	}
 
 	void set_file_valid_data(HANDLE f, boost::int64_t size)
 	{
+#ifndef TORRENT_WINRT
 		typedef BOOL (WINAPI *SetFileValidData_t)(HANDLE, LONGLONG);
 		static SetFileValidData_t pSetFileValidData = NULL;
 		static bool failed_kernel32 = false;
@@ -1946,6 +1971,7 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 		// we don't necessarily expect to have enough
 		// privilege to do this, so ignore errors.
 		pSetFileValidData(f, size);
+#endif
 	}
 #endif
 
@@ -1954,7 +1980,9 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 		TORRENT_ASSERT(is_open());
 		TORRENT_ASSERT(s >= 0);
 
-#ifdef TORRENT_WINDOWS
+#ifdef TORRENT_WINRT
+		return false;
+#elif defined TORRENT_WINDOWS
 
 		LARGE_INTEGER offs;
 		LARGE_INTEGER cur_size;
@@ -2135,7 +2163,9 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 
 	boost::int64_t file::get_size(error_code& ec) const
 	{
-#ifdef TORRENT_WINDOWS
+#ifdef TORRENT_WINRT
+		return -1;
+#elif defined TORRENT_WINDOWS
 		LARGE_INTEGER file_size;
 		if (!GetFileSizeEx(native_handle(), &file_size))
 		{
@@ -2156,7 +2186,7 @@ typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
 
 	boost::int64_t file::sparse_end(boost::int64_t start) const
 	{
-#ifdef TORRENT_WINDOWS
+#if defined TORRENT_WINDOWS && !defined TORRENT_WINRT
 
 #ifdef TORRENT_MINGW
 typedef struct _FILE_ALLOCATED_RANGE_BUFFER {
