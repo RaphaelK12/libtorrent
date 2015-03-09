@@ -50,7 +50,7 @@ namespace libtorrent
 	{
 	}
 
-#ifdef TORRENT_WINDOWS
+#if defined TORRENT_WINDOWS && !defined TORRENT_WINRT
 	void set_low_priority(file_handle const& f)
 	{
 		// file prio is only supported on vista and up
@@ -178,7 +178,7 @@ namespace libtorrent
 					m_files.erase(i);
 					return file_handle();
 				}
-#ifdef TORRENT_WINDOWS
+#if defined TORRENT_WINDOWS && !defined TORRENT_WINRT
 				if (m_low_prio_io)
 					set_low_priority(e.file_ptr);
 #endif
@@ -199,7 +199,7 @@ namespace libtorrent
 		std::string full_path = fs.file_path(file_index, p);
 		if (!e.file_ptr->open(full_path, m, ec))
 			return file_handle();
-#ifdef TORRENT_WINDOWS
+#if defined TORRENT_WINDOWS && !defined TORRENT_WINRT
 		if (m_low_prio_io)
 			set_low_priority(e.file_ptr);
 #endif
