@@ -116,6 +116,8 @@ namespace libtorrent { namespace
 	{
 #if TORRENT_HAS_SALEN
 		return sin->sa_len;
+#elif defined TORRENT_WINRT
+		return sizeof(sockaddr_in);
 #else
 		return sin->sa_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
 #endif
@@ -404,7 +406,9 @@ namespace libtorrent
 	{
 		TORRENT_UNUSED(ios); // this may be unused depending on configuration
 		std::vector<ip_interface> ret;
-#if TORRENT_USE_IFADDRS
+#ifdef TORRENT_WINRT
+		return ret;
+#elif defined TORRENT_USE_IFADDRS
 		int s = socket(AF_INET, SOCK_DGRAM, 0);
 		if (s < 0)
 		{
@@ -681,8 +685,9 @@ namespace libtorrent
 	std::vector<ip_route> enum_routes(error_code& ec)
 	{
 		std::vector<ip_route> ret;
-
-#if TORRENT_USE_SYSCTL
+#ifdef TORRENT_WINRT
+		return ret;
+#elif defined TORRENT_USE_SYSCTL
 /*
 		struct rt_msg
 		{
