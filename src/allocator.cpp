@@ -80,7 +80,8 @@ namespace libtorrent
 		static int s = 0;
 		if (s != 0) return s;
 
-#ifdef TORRENT_WINDOWS
+#ifdef TORRENT_WINRT
+#elif defined TORRENT_WINDOWS
 		SYSTEM_INFO si;
 		GetSystemInfo(&si);
 		s = si.dwPageSize;
